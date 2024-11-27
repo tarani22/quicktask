@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'screens/task_screen.dart';
+import 'screens/auth_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -11,12 +11,12 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'My App',
+      title: 'Task Manager',
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         useMaterial3: true,
       ),
-      home: const TaskScreen(),
+      home: const AuthScreen(),
     );
   }
 }
