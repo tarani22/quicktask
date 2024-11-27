@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
 
 class Task {
   String title;
@@ -27,6 +28,24 @@ class _TaskScreenState extends State<TaskScreen> {
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   DateTime? _selectedDate;
+  ParseUser? currentUser;
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentUser();
+  }
+
+  Future<void> _getCurrentUser() async {
+    currentUser = await ParseUser.currentUser() as ParseUser?;
+    setState(() {});
+  }
+
+  Future<void> _signOut() async {
+    final user = await ParseUser.currentUser() as ParseUser?;
+    await user?.logout();
+    Navigator.pushReplacementNamed(context, '/login');
+  }
 
   @override
   void dispose() {
@@ -128,6 +147,12 @@ class _TaskScreenState extends State<TaskScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Task List'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.logout),
+            onPressed: _signOut,
+          ),
+        ],
       ),
       body: ListView.builder(
         itemCount: _tasks.length,

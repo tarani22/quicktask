@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'screens/auth_screen.dart';
+import 'init.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await initBack4App();
   runApp(const MyApp());
 }
 
