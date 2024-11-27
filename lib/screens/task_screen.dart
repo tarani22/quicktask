@@ -1,10 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class Task {
   String title;
+  String description;
+  DateTime? dueDate;
   bool isCompleted;
 
-  Task({required this.title, this.isCompleted = false});
+  Task({
+    required this.title,
+    required this.description,
+    this.dueDate,
+    this.isCompleted = false,
+  });
 }
 
 class TaskScreen extends StatefulWidget {
@@ -16,21 +24,103 @@ class TaskScreen extends StatefulWidget {
 
 class _TaskScreenState extends State<TaskScreen> {
   final List<Task> _tasks = [];
-  final _textController = TextEditingController();
+  final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  DateTime? _selectedDate;
 
   @override
   void dispose() {
-    _textController.dispose();
+    _titleController.dispose();
+    _descriptionController.dispose();
     super.dispose();
   }
 
-  void _addTask(String title) {
-    if (title.isNotEmpty) {
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime.now(),
+      lastDate: DateTime(2101),
+    );
+    if (picked != null) {
       setState(() {
-        _tasks.add(Task(title: title));
+        _selectedDate = picked;
       });
-      _textController.clear();
     }
+  }
+
+  void _addTask() {
+    if (_titleController.text.isNotEmpty) {
+      setState(() {
+        _tasks.add(Task(
+          title: _titleController.text,
+          description: _descriptionController.text,
+          dueDate: _selectedDate,
+        ));
+      });
+      _titleController.clear();
+      _descriptionController.clear();
+      _selectedDate = null;
+      Navigator.pop(context);
+    }
+  }
+
+  void _showAddTaskModal() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(context).viewInsets.bottom,
+          left: 16,
+          right: 16,
+          top: 16,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: 'Title',
+                border: OutlineInputBorder(),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description',
+                border: OutlineInputBorder(),
+              ),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    _selectedDate == null
+                        ? 'No Due Date'
+                        : 'Due: ${DateFormat('MMM dd, yyyy').format(_selectedDate!)}',
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => _selectDate(context),
+                  child: const Text('Select Due Date'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: _addTask,
+              child: const Text('Add Task'),
+            ),
+            const SizedBox(height: 16),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -39,63 +129,59 @@ class _TaskScreenState extends State<TaskScreen> {
       appBar: AppBar(
         title: const Text('Task List'),
       ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(8.0),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: _textController,
-                    decoration: const InputDecoration(
-                      hintText: 'Enter a task',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
+      body: ListView.builder(
+        itemCount: _tasks.length,
+        itemBuilder: (context, index) {
+          final task = _tasks[index];
+          return Card(
+            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            child: ListTile(
+              leading: Checkbox(
+                value: task.isCompleted,
+                onChanged: (bool? value) {
+                  setState(() {
+                    task.isCompleted = value ?? false;
+                  });
+                },
+              ),
+              title: Text(
+                task.title,
+                style: TextStyle(
+                  decoration: task.isCompleted
+                      ? TextDecoration.lineThrough
+                      : null,
                 ),
-                const SizedBox(width: 8),
-                ElevatedButton(
-                  onPressed: () => _addTask(_textController.text),
-                  child: const Text('Add'),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView.builder(
-              itemCount: _tasks.length,
-              itemBuilder: (context, index) {
-                return ListTile(
-                  leading: Checkbox(
-                    value: _tasks[index].isCompleted,
-                    onChanged: (bool? value) {
-                      setState(() {
-                        _tasks[index].isCompleted = value ?? false;
-                      });
-                    },
-                  ),
-                  title: Text(
-                    _tasks[index].title,
-                    style: TextStyle(
-                      decoration: _tasks[index].isCompleted
-                          ? TextDecoration.lineThrough
-                          : null,
+              ),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(task.description),
+                  if (task.dueDate != null)
+                    Text(
+                      'Due: ${DateFormat('MMM dd, yyyy').format(task.dueDate!)}',
+                      style: TextStyle(
+                        color: task.dueDate!.isBefore(DateTime.now())
+                            ? Colors.red
+                            : Colors.grey,
+                      ),
                     ),
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete),
-                    onPressed: () {
-                      setState(() {
-                        _tasks.removeAt(index);
-                      });
-                    },
-                  ),
-                );
-              },
+                ],
+              ),
+              trailing: IconButton(
+                icon: const Icon(Icons.delete),
+                onPressed: () {
+                  setState(() {
+                    _tasks.removeAt(index);
+                  });
+                },
+              ),
             ),
-          ),
-        ],
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _showAddTaskModal,
+        child: const Icon(Icons.add),
       ),
     );
   }
