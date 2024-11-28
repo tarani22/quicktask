@@ -1,8 +1,8 @@
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
 
 Future<void> initBack4App() async {
-  const keyApplicationId = 'TXbKShwrQLtNFt2SiIpDFx3EY1GbFZsjm5Jd0wJZ';
-  const keyClientKey = 'WTjvkLcVvyBj8iYELgkSFeERPCTZZ0OxfhqYyB3J';
+  const keyApplicationId = '2GF8FbDJPtKbvoQT1N62VmyjY8zC8li7gyxDHKYE';
+  const keyClientKey = 'G222HaYbcT8BgLaRcUmHfTqykCYxnbdZ0GMN1QlY';
   const keyParseServerUrl = 'https://parseapi.back4app.com';
 
   await Parse().initialize(
@@ -12,4 +12,7 @@ Future<void> initBack4App() async {
     autoSendSessionId: true,
     debug: true,
   );
+
+  // Register the Task subclass
+  //Parse().registerSubclass<Task>(Task());
 } 

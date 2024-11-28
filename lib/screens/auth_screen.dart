@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
 import 'task_screen.dart';
 
 class AuthScreen extends StatefulWidget {
@@ -10,12 +11,10 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
+  bool _isLoading = false;
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-
-  // Add this map to simulate a simple user database
-  final Map<String, String> _users = {};
 
   void _showErrorDialog(String message) {
     showDialog(
@@ -33,40 +32,42 @@ class _AuthScreenState extends State<AuthScreen> {
     );
   }
 
-  void _submitForm() {
+  Future<void> _submitForm() async {
     if (_formKey.currentState!.validate()) {
-      final email = _emailController.text;
-      final password = _passwordController.text;
-
-      if (_isLogin) {
-        // Check if user exists
-        if (!_users.containsKey(email)) {
-          _showErrorDialog('No user found with this email. Please sign up first.');
-          return;
-        }
-        // Check if password matches
-        if (_users[email] != password) {
-          _showErrorDialog('Invalid password.');
-          return;
-        }
-        // Successful login
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const TaskScreen()),
+      setState(() => _isLoading = true);
+      
+      try {
+        final user = ParseUser(
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
+          _emailController.text.trim(),
         );
-      } else {
-        // Sign up logic
-        if (_users.containsKey(email)) {
-          _showErrorDialog('This email is already registered. Please login instead.');
-          return;
+
+        ParseResponse response;
+        if (_isLogin) {
+          response = await user.login();
+        } else {
+          response = await user.signUp();
         }
-        // Add new user
-        _users[email] = password;
-        setState(() {
-          _isLogin = true; // Switch to login mode
-        });
-        _showErrorDialog('Account created successfully! Please login.');
-        _emailController.clear();
-        _passwordController.clear();
+
+        if (response.success) {
+          if (_isLogin) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(builder: (context) => const TaskScreen()),
+            );
+          } else {
+            setState(() => _isLogin = true);
+            _showErrorDialog('Account created successfully! Please login.');
+            _emailController.clear();
+            _passwordController.clear();
+          }
+        } else {
+          _showErrorDialog(response.error?.message ?? 'An error occurred');
+        }
+      } catch (e) {
+        _showErrorDialog('An error occurred: $e');
+      } finally {
+        setState(() => _isLoading = false);
       }
     }
   }

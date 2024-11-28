@@ -2,18 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:parse_server_sdk_flutter/parse_server_sdk_flutter.dart';
 
-class Task {
-  String title;
-  String description;
-  DateTime? dueDate;
-  bool isCompleted;
+class Task extends ParseObject {
+  Task() : super('Task');
+  Task.clone() : this();
 
-  Task({
-    required this.title,
-    required this.description,
-    this.dueDate,
-    this.isCompleted = false,
-  });
+  @override
+  Task clone(Map<String, dynamic> map) => Task.clone()..fromJson(map);
+
+  String get title => get<String>('title') ?? '';
+  set title(String value) => set<String>('title', value);
+
+  String get description => get<String>('description') ?? '';
+  set description(String value) => set<String>('description', value);
+
+  DateTime? get dueDate => get<DateTime?>('dueDate');
+  set dueDate(DateTime? value) => set<DateTime?>('dueDate', value);
+
+  bool get isCompleted => get<bool>('isCompleted') ?? false;
+  set isCompleted(bool value) => set<bool>('isCompleted', value);
 }
 
 class TaskScreen extends StatefulWidget {
@@ -24,7 +30,8 @@ class TaskScreen extends StatefulWidget {
 }
 
 class _TaskScreenState extends State<TaskScreen> {
-  final List<Task> _tasks = [];
+  List<Task> _tasks = [];
+  bool _isLoading = true;
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   DateTime? _selectedDate;
@@ -34,6 +41,7 @@ class _TaskScreenState extends State<TaskScreen> {
   void initState() {
     super.initState();
     _getCurrentUser();
+    _loadTasks();
   }
 
   Future<void> _getCurrentUser() async {
@@ -68,19 +76,55 @@ class _TaskScreenState extends State<TaskScreen> {
     }
   }
 
-  void _addTask() {
-    if (_titleController.text.isNotEmpty) {
+  Future<void> _loadTasks() async {
+    final query = QueryBuilder<Task>(Task())
+      ..whereEqualTo('user', await ParseUser.currentUser());
+    final response = await query.query();
+    
+    if (response.success && response.results != null) {
       setState(() {
-        _tasks.add(Task(
-          title: _titleController.text,
-          description: _descriptionController.text,
-          dueDate: _selectedDate,
-        ));
+        _tasks = response.results!.cast<Task>();
+        _isLoading = false;
       });
-      _titleController.clear();
-      _descriptionController.clear();
-      _selectedDate = null;
-      Navigator.pop(context);
+    }
+  }
+
+  Future<void> _addTask() async {
+    if (_titleController.text.isNotEmpty) {
+      final task = Task()
+        ..title = _titleController.text
+        ..description = _descriptionController.text
+        ..dueDate = _selectedDate
+        ..isCompleted = false
+        ..set('user', await ParseUser.currentUser());
+
+      final response = await task.save();
+      if (response.success) {
+        setState(() {
+          _tasks.add(task);
+        });
+        _titleController.clear();
+        _descriptionController.clear();
+        _selectedDate = null;
+        if (mounted) Navigator.pop(context);
+      }
+    }
+  }
+
+  Future<void> _toggleTaskComplete(Task task, bool? value) async {
+    task.isCompleted = value ?? false;
+    final response = await task.save();
+    if (response.success) {
+      setState(() {});
+    }
+  }
+
+  Future<void> _deleteTask(Task task) async {
+    final response = await task.delete();
+    if (response.success) {
+      setState(() {
+        _tasks.remove(task);
+      });
     }
   }
 
@@ -154,56 +198,50 @@ class _TaskScreenState extends State<TaskScreen> {
           ),
         ],
       ),
-      body: ListView.builder(
-        itemCount: _tasks.length,
-        itemBuilder: (context, index) {
-          final task = _tasks[index];
-          return Card(
-            margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            child: ListTile(
-              leading: Checkbox(
-                value: task.isCompleted,
-                onChanged: (bool? value) {
-                  setState(() {
-                    task.isCompleted = value ?? false;
-                  });
-                },
-              ),
-              title: Text(
-                task.title,
-                style: TextStyle(
-                  decoration: task.isCompleted
-                      ? TextDecoration.lineThrough
-                      : null,
-                ),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(task.description),
-                  if (task.dueDate != null)
-                    Text(
-                      'Due: ${DateFormat('MMM dd, yyyy').format(task.dueDate!)}',
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: _tasks.length,
+              itemBuilder: (context, index) {
+                final task = _tasks[index];
+                return Card(
+                  margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  child: ListTile(
+                    leading: Checkbox(
+                      value: task.isCompleted,
+                      onChanged: (bool? value) => _toggleTaskComplete(task, value),
+                    ),
+                    title: Text(
+                      task.title,
                       style: TextStyle(
-                        color: task.dueDate!.isBefore(DateTime.now())
-                            ? Colors.red
-                            : Colors.grey,
+                        decoration: task.isCompleted
+                            ? TextDecoration.lineThrough
+                            : null,
                       ),
                     ),
-                ],
-              ),
-              trailing: IconButton(
-                icon: const Icon(Icons.delete),
-                onPressed: () {
-                  setState(() {
-                    _tasks.removeAt(index);
-                  });
-                },
-              ),
+                    subtitle: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(task.description),
+                        if (task.dueDate != null)
+                          Text(
+                            'Due: ${DateFormat('MMM dd, yyyy').format(task.dueDate!)}',
+                            style: TextStyle(
+                              color: task.dueDate!.isBefore(DateTime.now())
+                                  ? Colors.red
+                                  : Colors.grey,
+                            ),
+                          ),
+                      ],
+                    ),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.delete),
+                      onPressed: () => _deleteTask(task),
+                    ),
+                  ),
+                );
+              },
             ),
-          );
-        },
-      ),
       floatingActionButton: FloatingActionButton(
         onPressed: _showAddTaskModal,
         child: const Icon(Icons.add),
